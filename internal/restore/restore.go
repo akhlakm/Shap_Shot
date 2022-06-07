@@ -59,7 +59,7 @@ func Execute() {
 	}
 	remoteHistory.Load()
 	localHistory = calc_action_items(remoteHistory, localHistory)
-	localHistory = calculate_meta_items(localHistory)
+	localHistory, _ = calculate_meta_items(localHistory)
 
 	logger.Print("\nChanges to commit:\n")
 	localHistory.Print()
@@ -72,6 +72,7 @@ func Execute() {
 		perform_actions(localHistory)
 		settings.SetLastSnapshot(remoteHistory.SnapId)
 		settings.Write()
+		logger.Print(fmt.Sprintf("Last snapshot synced: %d", remoteHistory.SnapId))
 	} else {
 		logger.Print("\nDry run. Snapshot is NOT restored.")
 		logger.Print("Please specify --go to commit the changes.")
@@ -79,14 +80,16 @@ func Execute() {
 }
 
 func perform_actions(loc *history.Hist) {
-	count := 0
+	ccount := 0
+	dcount := 0
 	rootpath := fileutils.CurrentWD()
 	for phash := range loc.RelPath {
 		crud := loc.GetCrud(phash)
+		relpath := loc.GetRelPath(phash)
+		dstpath := fileutils.PathJoin(rootpath, relpath)
+		// copy is create
 		if crud == "C" || crud == "U" {
-			relpath := loc.GetRelPath(phash)
 			srcpath := loc.GetRestorePath(phash)
-			dstpath := fileutils.PathJoin(rootpath, relpath)
 
 			if !fileutils.FileExists(srcpath) {
 				errmsg := "File does not exist in remote.\n" +
@@ -103,16 +106,25 @@ func perform_actions(loc *history.Hist) {
 				fmt.Println(err)
 				logger.Error("restore-copyfile", srcpath, "Failed to copy file.")
 			}
-			count++
+			ccount++
 			logger.Print(fmt.Sprintf("OK -- %s (%d bytes)", relpath, cpbytes))
+		} else if crud == "D" {
+			err := fileutils.DeleteFile(dstpath)
+			if err != nil {
+				errmsg := "Failed to delete file.\n" +
+					"\nMake sure the file is not being accessed by another process.\n" +
+					"Or try manually deleting it first.\n"
+				logger.Error("restore-delete", dstpath, errmsg)
+			} else {
+				dcount++
+				logger.Print(fmt.Sprintf("OK -- %s (delete)", relpath))
+			}
 		}
-
-		// We are not deleting anything.
 	}
-	logger.Print(fmt.Sprintf("DONE -- %d files copied", count))
+	logger.Print(fmt.Sprintf("DONE -- %d files copied, %d files removed", ccount, dcount))
 }
 
-func calculate_meta_items(hist *history.Hist) *history.Hist {
+func calculate_meta_items(hist *history.Hist) (*history.Hist, []int) {
 	create := hist.CountCrud("C")
 	retain := hist.CountCrud("R")
 	update := hist.CountCrud("U")
@@ -124,7 +136,9 @@ func calculate_meta_items(hist *history.Hist) *history.Hist {
 	crud := fmt.Sprintf("+%d;=%d;^%d;-%d", create, retain, update, delete)
 	hist.SetMetaString("CRUD", crud)
 
-	return hist
+	ncrud := []int{create, retain, update, delete}
+
+	return hist, ncrud
 }
 
 func calc_action_items(rem, loc *history.Hist) *history.Hist {

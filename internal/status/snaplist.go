@@ -41,7 +41,8 @@ func Execute() {
 
 	currSS := settings.LastSnapshot()
 	logger.Print(fmt.Sprintf("Last snapshot synced: %d", currSS))
-	logger.Print("Please run 'shot' to see a list of changes from the last snapshot.")
+	logger.Print("\nPlease specify a snapshot number to see a list of file changes.")
+	logger.Print("Or run 'shot' to see a list of current changes from the last snapshot.")
 }
 
 func show_snap_info(remote string, rootname string, ssname string) {

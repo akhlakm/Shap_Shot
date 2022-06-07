@@ -30,8 +30,26 @@ func main() {
 			} else if cmd == "shot" {
 				snapshot.Execute()
 			} else {
-				logger.Error("main", cmd, "Unknown argument")
+				logger.Error("main", cmd,
+					"Unknown argument.\n"+
+						"Please use one of the init, pull, shot, list commands.")
 			}
+		}
+	} else {
+		if settings.Exists() {
+			logger.Error("main", "",
+				"No argument.\n"+
+					"\nPlease specify one of the following commands, all of them are safe to run.\n"+
+					"pull, shot, list")
+		} else {
+			logger.Error("main", "",
+				"Not initialized as a project root.\n"+
+					"\nPlease run 'init' with a rootname (a name for the current project directory),\n"+
+					"and a path to a remote folder to backup to, or restore from.\n\n"+
+					"Make sure your rootname is future-proof. Each remote can contain multiple roots.\n"+
+					"Once you initialized, you will be able to take a snapshot of the current directory,\n"+
+					"or view a list of snapshots if you have an existing remote and restore them.\n"+
+					"\nUSAGE: init <rootname> <remote folder path>\n")
 		}
 	}
 

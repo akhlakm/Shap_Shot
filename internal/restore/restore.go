@@ -13,7 +13,14 @@ import (
 
 func Execute() {
 	args := argparser.GetParser()
+
 	remote := settings.DefaultRemote()
+	if !fileutils.DirExists(remote) {
+		errmsg := "Remote directory does not exist.\n" +
+			"\nMake sure it is mounted. Or take your first snapshot and it will be created automatically.\n"
+		logger.Error("restore-execute", remote, errmsg)
+	}
+
 	rootname := settings.RootName()
 
 	// load the last ss
@@ -21,10 +28,10 @@ func Execute() {
 	lastss := settings.LastSnapshot()
 	lastHistory := history.Make(lastss, remote, rootname)
 	if lastss > 0 && !fileutils.SSExists(lastss, remote, rootname) {
-		logger.Error("snapshot-load", fmt.Sprint(lastss),
-			"No such snapshot exists, current settings might be invalid, "+
-				"or remote files might be corrupted. "+
-				"Please check remote files and rerun 'init'.")
+		logger.Error("restore-load", fmt.Sprint(lastss),
+			"Last snapshot does not exist in remote.\n"+
+				"\nRoot settings suggest existence of previous snapshots.\n"+
+				"Please rerun 'init' if needed, or run 'list' to see the available snapshots in the remote.")
 	}
 
 	lastHistory.Load()
@@ -59,13 +66,15 @@ func Execute() {
 
 	if args.HasFlag("--dry") || args.HasFlag("-n") {
 		// --dry has a higher priority over --go
-		logger.Print("\nDry run. Snapshot is NOT restored.\n")
+		logger.Print("\nDry run. Snapshot is NOT restored.")
+		logger.Print("Please specify --go to commit the changes.")
 	} else if args.HasFlag("--go") || args.HasFlag("-go") {
 		perform_actions(localHistory)
 		settings.SetLastSnapshot(remoteHistory.SnapId)
 		settings.Write()
 	} else {
-		logger.Print("\nDry run. Snapshot is NOT restored.\n")
+		logger.Print("\nDry run. Snapshot is NOT restored.")
+		logger.Print("Please specify --go to commit the changes.")
 	}
 }
 
@@ -80,7 +89,13 @@ func perform_actions(loc *history.Hist) {
 			dstpath := fileutils.PathJoin(rootpath, relpath)
 
 			if !fileutils.FileExists(srcpath) {
-				logger.Error("restore-action", srcpath, "File does not exists.")
+				errmsg := "File does not exist in remote.\n" +
+					"\nMake sure the files/ directory of the current root is okay\n" +
+					"and the files are not missing. If you have manually deleted files\n" +
+					"the file pointers in the shot file might be broken.\n" +
+					"See a detail list of files first using the list <snapshot> command.\n"
+
+				logger.Error("restore-action", srcpath, errmsg)
 			}
 			logger.Trace("restore-copyfile", dstpath)
 			cpbytes, err := fileutils.CopyFile(srcpath, dstpath)
@@ -175,8 +190,9 @@ func check_local_modifications(last, new *history.Hist) {
 			oldFHash := last.GetFileHash(phash)
 			newFHash := new.GetFileHash(phash)
 			if !fileutils.FileHashSame(oldFHash, newFHash) {
-				logger.Error("restore-check-modifications", fmt.Sprintf("U %s (%s =/=> %s)", relpath, oldFHash, newFHash),
-					"Local modifications found, please take a snapshot first.")
+				logger.Error("restore-check-modifications",
+					fmt.Sprintf("U %s\n      (%s =/=> %s)", relpath, oldFHash, newFHash),
+					"\nLocal modifications found, please take a snapshot first.")
 			}
 		}
 	}

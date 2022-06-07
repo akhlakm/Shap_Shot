@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -115,6 +116,30 @@ func CalcRelativePath(basepath string, fullpath string) (string, error) {
 	return filepath.Rel(basepath, fullpath)
 }
 
+func IsASubPath(parent, child string) bool {
+	// get abspath first
+	parent, _ = AbsolutePath(parent)
+	child, _ = AbsolutePath(child)
+
+	// normalize
+	parent = PathNormalize(parent)
+	child = PathNormalize(child)
+
+	// calc parent path to child path relation
+	relation, err := filepath.Rel(parent, child)
+
+	// cannot determine such relation
+	if err != nil {
+		return false
+	} else {
+		if strings.Contains(relation, "..") {
+			return false
+		} else {
+			return true
+		}
+	}
+}
+
 func FormatSnap(id int) string {
 	return fmt.Sprintf(back_snap_format, id)
 }
@@ -133,6 +158,8 @@ func GetTimeString() string {
 }
 
 func GetRootSettingsPath() string {
+	// @todo: back navigate to top to find any existing
+	// settings file in a parent directory.
 	return PathNormalize(root_settings_name)
 }
 
@@ -140,14 +167,27 @@ func PathJoin(elem ...string) string {
 	return filepath.Join(elem...)
 }
 
+// Convert path to forward slash
+// go works well with forward slash everywhere
 func PathNormalize(path string) string {
-	return filepath.FromSlash(path)
+	path = filepath.FromSlash(path)
+	res := ""
+	for i := 0; i < len(path); i++ {
+		char := path[i]
+		if char == '\\' {
+			char = '/'
+		}
+		res += string(char)
+	}
+	return res
 }
 
 func AbsolutePath(path string) (string, error) {
 	return filepath.Abs(path)
 }
 
+// Copy to a temp file first, then rename.
+// Create the parent dir, if not exist.
 func CopyFile(src, dst string) (int64, error) {
 	if src == dst {
 		return 0, nil
@@ -163,7 +203,7 @@ func CopyFile(src, dst string) (int64, error) {
 		in.Close()
 		return 0, err
 	}
-	// out, err := os.Create(dst)
+
 	tmpfile := dst + ".tmp"
 	tmp, err := os.OpenFile(tmpfile, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
@@ -213,7 +253,7 @@ func CopyFile(src, dst string) (int64, error) {
 func DeleteFile(path string) error {
 	err := os.Remove(path)
 	if err != nil {
-		return fmt.Errorf("failed removing file: %s", err)
+		return fmt.Errorf("failed to remove file: %s", err)
 	}
 	return nil
 }

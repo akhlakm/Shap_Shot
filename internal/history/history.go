@@ -197,7 +197,7 @@ func (h *Hist) AddMetaInt(key string, value int) {
 	}
 	prev, err := strconv.Atoi(h.Meta[key])
 	if err != nil {
-		logger.Error("history-add-meta", key, "Cannot add to meta information.")
+		logger.Error("history-add-meta", key, "Cannot parse meta as an integer to add to.")
 	}
 	h.Meta[key] = strconv.Itoa(prev + value)
 }
@@ -316,8 +316,17 @@ func (h *Hist) Load() {
 			// Root1>RelPath>CU>PathHash>02>Name>FileHash
 			// Count 6 '>' else throw error
 			parts := strings.Split(line, ">")
+			if len(parts) < 7 {
+				errmsg := "Snapshot file unreadable.\n" +
+					"\nPlease make sure you have not manually edited the shot files in the history/ directory.\n" +
+					"Expected format: Root1>RelPath>CU>PathHash>02>Name>FileHash\n"
+				logger.Error("history-load", line, errmsg)
+			}
 			if h.RootName != strings.TrimSpace(parts[0]) {
-				logger.Error("history-load", parts[0], "History was written under a different root.")
+				errmsg := "Snapshot was taken under a different root or different rootname.\n" +
+					"\nPlease make sure you initialized with the same rootname.\n" +
+					"If you want, you can manually rename the root directory in the remote.\n"
+				logger.Error("history-load", parts[0], errmsg)
 			}
 
 			relpath := strings.TrimSpace(parts[1])
@@ -332,7 +341,7 @@ func (h *Hist) Load() {
 			itarget, err := strconv.ParseInt(target, 10, 0)
 			if err != nil {
 				fmt.Println(line, "\n", err)
-				logger.Error("history-load", target, "Not a valid snapshot target.")
+				logger.Error("history-load", target, "Not a valid snapshot target, shot file unreadable.")
 			}
 			h.SetTarget(pathhash, int(itarget))
 		}

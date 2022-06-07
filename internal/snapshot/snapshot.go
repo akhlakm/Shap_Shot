@@ -21,8 +21,17 @@ func Execute() {
 	lastss := settings.LastSnapshot()
 	lastHistory := history.Make(lastss, remote, rootname)
 	if lastss > 0 && !fileutils.SSExists(lastss, remote, rootname) {
+
+		if !fileutils.DirExists(remote) {
+			errmsg := "Remote directory does not exist.\n" +
+				"\nMake sure it is mounted.\n"
+			logger.Error("snapshot-execute", remote, errmsg)
+		}
+
 		logger.Error("snapshot-load", fmt.Sprint(lastss),
-			"No such snapshot exists, current settings might be invalid. Please rerun 'init' if needed.")
+			"Last snapshot does not exist in remote.\n"+
+				"\nRoot settings suggest existence of previous snapshots.\n"+
+				"Please rerun 'init' if needed, or run 'list' to see the available snapshots in the remote.")
 	}
 
 	lastHistory.Load()
@@ -38,13 +47,19 @@ func Execute() {
 	newHistory.Print()
 
 	if args.HasFlag("--dry") || args.HasFlag("-n") {
-		logger.Print("\nDry run. Snapshot is NOT commited.\n")
-	} else {
+		// --dry has a higher priority over --go
+		logger.Print("\nDry run. Snapshot is NOT committed.")
+		logger.Print("Please specify --go to commit the changes.")
+	} else if args.HasFlag("--go") || args.HasFlag("-go") {
 		perform_actions(newHistory)
 		newHistory.Write()
 		settings.SetLastSnapshot(newHistory.SnapId)
 		settings.Write()
+	} else {
+		logger.Print("\nDry run. Snapshot is NOT committed.")
+		logger.Print("Please specify --go to commit the changes.")
 	}
+
 }
 
 func perform_actions(hist *history.Hist) {
@@ -58,7 +73,7 @@ func perform_actions(hist *history.Hist) {
 			dstpath := hist.GetBackupPath(phash)
 
 			if !fileutils.FileExists(srcpath) {
-				logger.Error("snapshot-action", srcpath, "File does not exists.")
+				logger.Error("snapshot-copyfile", srcpath, "File does not exists.")
 			}
 			logger.Trace("snapshot-copyfile", dstpath)
 			// fmt.Println("copy :", srcpath, "==>", dstpath)
@@ -138,7 +153,7 @@ func compare(last, new *history.Hist) *history.Hist {
 
 func walk_root(hist *history.Hist) *history.Hist {
 	rootpath := fileutils.CurrentWD()
-	hist.SetMetaString("PWD", rootpath)
+	hist.SetMetaString("ROOTDIR", rootpath)
 
 	filepath.WalkDir(rootpath, func(s string, d fs.DirEntry, e error) error {
 		if e != nil {

@@ -35,26 +35,39 @@ func Create(rootname string, remotepath string) {
 
 func DefaultRemote() string {
 	if _, ok := initialized.remotes["default"]; !ok {
-		logger.Error("settings-default-remote", "", "No 'default' remote exists in settings.")
+		logger.Error("settings-default-remote", "",
+			"No 'default' remote exists in the settings file.\n"+
+				"\nPlease make sure the remotes section contains a default field to a remote path."+
+				"\nOr, run init again.")
 	}
+
 	return initialized.remotes["default"]
 }
 
 func RootName() string {
 	if _, ok := initialized.root["name"]; !ok {
-		logger.Error("settings-root-name", "", "No root 'name' exists in settings.")
+		logger.Error("settings-root-name", "",
+			"No root name in the settings file.\n"+
+				"\nPlease make sure the root section contains a name field for the current directory."+
+				"\nOr, run init again.")
 	}
 	return initialized.root["name"]
 }
 
 func LastSnapshot() int {
 	if _, ok := initialized.root["snapshot"]; !ok {
-		logger.Error("settings-last-snapshot", "", "No root 'snapshot' exists in settings.")
+		logger.Error("settings-last-snapshot", "",
+			"No snapshot number in the settings file.\n"+
+				"\nPlease make sure the settings file contains a valid snapshot number."+
+				"\nOr, run init again.")
 	}
 
 	ss, err := strconv.Atoi(initialized.root["snapshot"])
 	if err != nil {
-		logger.Error("settings-last-snapshot", "", "Cannot determine the last snapshot number.")
+		logger.Error("settings-last-snapshot", "",
+			"Invalid snapshot number in the settings file.\n"+
+				"\nPlease make sure the settings file contains a valid snapshot number."+
+				"\nOr, run init again.")
 	}
 
 	return ss
@@ -72,6 +85,11 @@ func Write() {
 	}
 }
 
+func Exists() bool {
+	file := fileutils.GetRootSettingsPath()
+	return fileutils.FileExists(file)
+}
+
 func Load() {
 	if initialized == nil {
 		initialized = &Settings{
@@ -83,7 +101,11 @@ func Load() {
 	if fileutils.FileExists(initialized.file) {
 		initialized.read()
 	} else {
-		logger.Error("settings-load", initialized.file, "No settings file found in CWD.")
+		logger.Error("settings-load", initialized.file,
+			"No settings file found.\n"+
+				"\nPlease run 'init' with a rootname (a name for the current project directory),\n"+
+				"and a path to a remote folder to backup to.\n"+
+				"\nUSAGE: init <rootname> <remote folder path>\n")
 	}
 }
 
@@ -156,20 +178,20 @@ func (s *Settings) read() {
 		}
 
 		// Sanity check
-		if _, ok := s.root["name"]; !ok {
-			fmt.Print(s.root)
-			logger.Error("read-settings", s.file, "No root 'name' exists in settings.")
-		}
-		if _, ok := s.root["snapshot"]; !ok {
-			logger.Error("read-settings", s.file, "No root 'snapshot' exists in settings.")
-		}
-		if _, ok := s.remotes["default"]; !ok {
-			logger.Error("read-settings", s.file, "No 'default' remote exists in settings.")
-		}
+		// if _, ok := s.root["name"]; !ok {
+		// 	fmt.Print(s.root)
+		// 	logger.Error("read-settings", s.file, "No root 'name' exists in the settings file.")
+		// }
+		// if _, ok := s.root["snapshot"]; !ok {
+		// 	logger.Error("read-settings", s.file, "No root 'snapshot' exists in the settings file.")
+		// }
+		// if _, ok := s.remotes["default"]; !ok {
+		// 	logger.Error("read-settings", s.file, "No 'default' remote exists in the settings file.")
+		// }
 
 		logger.Done("read-settings", "")
 	} else {
-		logger.Error("read-settings", s.file, "Directory not initialized as a root.")
+		logger.Error("read-settings", s.file, "Directory does not contain a settings file.")
 	}
 
 }

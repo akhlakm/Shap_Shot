@@ -45,7 +45,7 @@ func Make(ssid int, remote string, rootname string) *Hist {
 		CRUD:         make(map[string]string),
 	}
 
-	hist.SetMetaString("SSID", fileutils.FormatSnap(ssid))
+	hist.SetMetaString("SSID", fmt.Sprint(ssid))
 	hist.SetMetaString("REMOTE", remote)
 	hist.SetMetaString("ROOT", rootname)
 	return hist

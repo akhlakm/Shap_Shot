@@ -3,7 +3,6 @@ package status
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"snap/internal/argparser"
 	"snap/internal/fileutils"
 	"snap/internal/history"
@@ -62,7 +61,11 @@ func list_snap_files(remote, rootname string) []string {
 	histDir := fileutils.SSHistoryDir(remote, rootname)
 	files, err := ioutil.ReadDir(histDir)
 	if err != nil {
-		log.Fatal(err)
+		if !fileutils.DirExists(histDir) {
+			errmsg := "Remote history does not exist.\n" +
+				"\nMake sure the remote is mounted. Or take your first snapshot and it will be created automatically.\n"
+			logger.Error("show-history", histDir, errmsg)
+		}
 	}
 
 	var snapnames []string

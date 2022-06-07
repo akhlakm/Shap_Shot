@@ -15,7 +15,7 @@ import (
 )
 
 const root_settings_name string = ".shot-settings"
-const back_snap_format string = "%04d"
+const back_snap_format string = "_%04d"
 const back_files_directory string = "files"
 const back_hist_directory string = "history"
 const back_snap_file_format string = "%04d.shot"
@@ -77,11 +77,10 @@ func CurrentWD() string {
 	return PathNormalize(cwd)
 }
 
-func CalcPathHash(relpath string) string {
-	relpath = PathNormalize(relpath)
+func CalcPathMd5(path string) string {
 	hash := md5.New()
-	for i := 0; i < len(relpath); i++ {
-		char := relpath[i]
+	for i := 0; i < len(path); i++ {
+		char := path[i]
 		// get rid of path characters
 		if char == '/' || char == '\\' || char == ':' {
 			char = '>'
@@ -92,8 +91,15 @@ func CalcPathHash(relpath string) string {
 	hashInBytes := hash.Sum(nil)
 	hashStr := hex.EncodeToString(hashInBytes)
 
-	// fmt.Println(relpath, "=>", hashStr)
 	return hashStr
+}
+
+func CalcPathHash(relpath string) string {
+	relpath = PathNormalize(relpath)
+	// get the dir
+	dir, _ := filepath.Split(relpath)
+	// return CalcPathMd5(relpath)
+	return dir
 }
 
 func CalcFileHash(fullpath string, d fs.DirEntry) (string, error) {

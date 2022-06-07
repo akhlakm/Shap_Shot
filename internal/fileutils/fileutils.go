@@ -97,9 +97,9 @@ func CalcPathMd5(path string) string {
 func CalcPathHash(relpath string) string {
 	relpath = PathNormalize(relpath)
 	// get the dir
-	dir, _ := filepath.Split(relpath)
+	// dir, _ := filepath.Split(relpath)
 	// return CalcPathMd5(relpath)
-	return dir
+	return relpath
 }
 
 func CalcFileHash(fullpath string, d fs.DirEntry) (string, error) {

@@ -116,7 +116,7 @@ func (h *Hist) GetBackupPath(phash string) string {
 	backpath := fileutils.BackPath(h.Remote, h.RootName)
 	fmtsnap := fileutils.FormatSnap(h.SnapId)
 	filename := h.Name[phash]
-	relbackpath := fileutils.PathJoin(backpath, phash, fmtsnap, filename)
+	relbackpath := fileutils.PathJoin(backpath, phash, fmtsnap+"_"+filename)
 	abspath, err := fileutils.AbsolutePath(relbackpath)
 	if err != nil {
 		logger.Error("history-backup-path", relbackpath, "Failed to calculate absolute path.")
@@ -129,7 +129,7 @@ func (h *Hist) GetRestorePath(phash string) string {
 	backpath := fileutils.BackPath(h.Remote, h.RootName)
 	fmtsnap := fileutils.FormatSnap(h.GetTarget(phash))
 	filename := h.Name[phash]
-	relbackpath := fileutils.PathJoin(backpath, phash, fmtsnap, filename)
+	relbackpath := fileutils.PathJoin(backpath, phash, fmtsnap+"_"+filename)
 	abspath, err := fileutils.AbsolutePath(relbackpath)
 	if err != nil {
 		logger.Error("history-restore-path", relbackpath, "Failed to calculate absolute path.")

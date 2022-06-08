@@ -159,7 +159,6 @@ func calc_action_items(rem, loc *history.Hist) *history.Hist {
 	// For each path in the root,
 	for _, phash := range loc.PathHashList() {
 		if settings.ShouldIgnore(loc.GetRelPath(phash)) {
-			// we will not touch the file
 			loc.SetCrud(phash, "I")
 		} else if !rem.IsPathHash(phash) {
 			// no such file in the remote
@@ -193,8 +192,8 @@ func calc_action_items(rem, loc *history.Hist) *history.Hist {
 				loc.SetTarget(phash, remTarget)
 			}
 		} else {
-			// copy everything else that hasn't been deleted or ignored in the remote
-			if rem.GetCrud(phash) != "D" && rem.GetCrud(phash) != "I" {
+			// copy everything else that hasn't been deleted in the remote
+			if rem.GetCrud(phash) != "D" {
 				loc.SetAction(phash, rem.GetAction(phash))
 				loc.SetCrud(phash, "C")
 				remTarget := rem.GetTarget(phash)

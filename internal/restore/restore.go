@@ -3,6 +3,8 @@ package restore
 import (
 	"fmt"
 	"io/fs"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"snap/internal/argparser"
 	"snap/internal/fileutils"
@@ -75,6 +77,7 @@ func Execute() {
 		perform_actions(localHistory)
 		settings.SetLastSnapshot(remoteHistory.SnapId)
 		settings.Write()
+		prune_empty_dirs()
 		logger.Print(fmt.Sprintf("Last snapshot synced: %d", remoteHistory.SnapId))
 	} else {
 		logger.Print(fmt.Sprintf("\nDry run %d < %d. Snapshot is NOT restored.", lastss, newss))
@@ -277,6 +280,36 @@ func calc_latest_ssid(remote string, rootname string) int {
 		}
 	}
 	return 0
+}
+
+func prune_empty_dirs() {
+	rootpath := fileutils.CurrentWD()
+
+	filepath.WalkDir(rootpath, func(fullpath string, d fs.DirEntry, e error) error {
+		if e != nil {
+			// fmt.Println(e)
+			// not a big deal, ignore if we cannot remove it
+			// logger.Error("restore-prune-empty", rootpath, "Failed to walk root directory.")
+			return nil
+		}
+		if d.IsDir() {
+			files, err := ioutil.ReadDir(fullpath)
+			if err != nil {
+				fmt.Printf("Warning -- failed to list directory: %s, %s\n", fullpath, err)
+				return nil
+			}
+
+			if len(files) != 0 {
+				return nil
+			}
+
+			err = os.Remove(fullpath)
+			if err != nil {
+				fmt.Printf("Warning -- failed to remove empty directory: %s, %s\n", fullpath, err)
+			}
+		}
+		return nil
+	})
 }
 
 // let LAST = last snapshot = 06 (say)

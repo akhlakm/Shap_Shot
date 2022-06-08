@@ -112,10 +112,9 @@ func calculate_meta_items(hist *history.Hist) *history.Hist {
 	ignore := hist.CountCrud("I")
 	total := create + retain + update
 	hist.SetMetaInt("FileCount", total)
-	hist.SetMetaInt("IgnoreCount", ignore)
 
 	// format crud: +9;=20;^2;-1
-	crud := fmt.Sprintf("+%d;=%d;^%d;-%d", create, retain, update, delete)
+	crud := fmt.Sprintf("+%d;=%d;^%d;-%d;*%d", create, retain, update, delete, ignore)
 	hist.SetMetaString("CRUD", crud)
 
 	hist.SetMetaString("DATE", fileutils.GetTimeString())

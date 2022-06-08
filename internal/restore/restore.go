@@ -69,16 +69,16 @@ func Execute() {
 
 	if args.HasFlag("--dry") || args.HasFlag("-n") {
 		// --dry has a higher priority over --go
-		logger.Print(fmt.Sprintf("\nDry run %d > %d. Snapshot is NOT restored.", lastss, newss))
-		logger.Print("Please specify --go to commit the changes.")
+		logger.Print(fmt.Sprintf("\nDry run %d < %d. Snapshot is NOT restored.", lastss, newss))
+		logger.Print("Please specify --go to commit the changes, -i to list the ignored items.")
 	} else if args.HasFlag("--go") || args.HasFlag("-go") {
 		perform_actions(localHistory)
 		settings.SetLastSnapshot(remoteHistory.SnapId)
 		settings.Write()
 		logger.Print(fmt.Sprintf("Last snapshot synced: %d", remoteHistory.SnapId))
 	} else {
-		logger.Print(fmt.Sprintf("\nDry run %d > %d. Snapshot is NOT restored.", lastss, newss))
-		logger.Print("Please specify --go to commit the changes.")
+		logger.Print(fmt.Sprintf("\nDry run %d < %d. Snapshot is NOT restored.", lastss, newss))
+		logger.Print("Please specify --go to commit the changes, -i to list the ignored items.")
 	}
 }
 
@@ -144,10 +144,9 @@ func calculate_meta_items(hist *history.Hist) (*history.Hist, []int) {
 	ignore := hist.CountCrud("I")
 	total := create + retain + update
 	hist.SetMetaInt("FileCount", total)
-	hist.SetMetaInt("IgnoreCount", ignore)
 
 	// format crud: +9;=20;^2;-1
-	crud := fmt.Sprintf("+%d;=%d;^%d;-%d", create, retain, update, delete)
+	crud := fmt.Sprintf("+%d;=%d;^%d;-%d;*%d", create, retain, update, delete, ignore)
 	hist.SetMetaString("CRUD", crud)
 
 	ncrud := []int{create, retain, update, delete}

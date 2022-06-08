@@ -73,6 +73,7 @@ func perform_actions(hist *history.Hist) {
 	for phash := range hist.RelPath {
 		crud := hist.GetCrud(phash)
 		if crud == "C" || crud == "U" {
+			// copy file to remote
 			relpath := hist.GetRelPath(phash)
 			srcpath := fileutils.PathJoin(rootpath, relpath)
 			dstpath := hist.GetBackupPath(phash)
@@ -132,30 +133,24 @@ func compare(last, new *history.Hist) *history.Hist {
 	for _, phash := range new.PathHashList() {
 		if settings.ShouldIgnore(new.GetRelPath(phash)) {
 			new.SetCrud(phash, "I")
-			if last.IsPathHash(phash) {
+			continue
+		}
+		if !last.IsPathHash(phash) {
+			// 	C = If PathHash not in last
+			new.SetCrud(phash, "C")
+			new.SetTarget(phash, new.SnapId)
+		} else {
+			oldFHash := last.GetFileHash(phash)
+			newFHash := new.GetFileHash(phash)
+			if fileutils.FileHashSame(oldFHash, newFHash) {
+				// 	R = If pathHash in 01 and FileHash same
+				new.SetCrud(phash, "R")
 				lastTarget := last.GetTarget(phash)
 				new.SetTarget(phash, lastTarget)
 			} else {
+				// 	U = If PathHash in 01 and FileHash not same
+				new.SetCrud(phash, "U")
 				new.SetTarget(phash, new.SnapId)
-			}
-		} else {
-			if !last.IsPathHash(phash) {
-				// 	C = If PathHash not in last
-				new.SetCrud(phash, "C")
-				new.SetTarget(phash, new.SnapId)
-			} else {
-				oldFHash := last.GetFileHash(phash)
-				newFHash := new.GetFileHash(phash)
-				if fileutils.FileHashSame(oldFHash, newFHash) {
-					// 	R = If pathHash in 01 and FileHash same
-					new.SetCrud(phash, "R")
-					lastTarget := last.GetTarget(phash)
-					new.SetTarget(phash, lastTarget)
-				} else {
-					// 	U = If PathHash in 01 and FileHash not same
-					new.SetCrud(phash, "U")
-					new.SetTarget(phash, new.SnapId)
-				}
 			}
 		}
 	}
@@ -165,7 +160,7 @@ func compare(last, new *history.Hist) *history.Hist {
 	for _, phash := range last.PathHashList() {
 		lastcrud := last.GetCrud(phash)
 		// file was not deleted/ignored in the last ss
-		if lastcrud != "D" && lastcrud != "I" {
+		if lastcrud != "D" {
 			// no such file exist now, it has been deleted
 			if !new.IsPathHash(phash) {
 				lf := last.GetAction(phash)

@@ -43,12 +43,17 @@ func Execute() {
 	newHistory = walk_root(newHistory)
 	newHistory = compare(lastHistory, newHistory)
 	newHistory = calculate_meta_items(newHistory)
+
+	if args.HasFlag("--ignores") || args.HasFlag("-i") {
+		newHistory.PrintCrud("I")
+	}
+
 	logger.Print("\nChanges to commit:\n")
 	newHistory.Print()
 
 	if args.HasFlag("--dry") || args.HasFlag("-n") {
 		// --dry has a higher priority over --go
-		logger.Print("\nDry run. Snapshot is NOT committed.")
+		logger.Print(fmt.Sprintf("\nDry run %d > %d. Snapshot is NOT committed.", lastss, newss))
 		logger.Print("Please specify --go to commit the changes.")
 	} else if args.HasFlag("--go") || args.HasFlag("-go") {
 		perform_actions(newHistory)
@@ -56,7 +61,7 @@ func Execute() {
 		settings.SetLastSnapshot(newHistory.SnapId)
 		settings.Write()
 	} else {
-		logger.Print("\nDry run. Snapshot is NOT committed.")
+		logger.Print(fmt.Sprintf("\nDry run %d > %d. Snapshot is NOT committed.", lastss, newss))
 		logger.Print("Please specify --go to commit the changes.")
 	}
 
@@ -83,19 +88,30 @@ func perform_actions(hist *history.Hist) {
 				logger.Error("snapshot-copyfile", srcpath, "Failed to copy file.")
 			}
 			count++
-			logger.Print(fmt.Sprintf("OK -- %s (%d bytes)", relpath, cpbytes))
+
+			// we know how many bytes should have been copied
+			if !fileutils.FileSizeSame(hist.GetFileHash(phash), cpbytes) {
+				logger.Print(fmt.Sprintf("WARNING -- %s (%d bytes) copy does not match with "+
+					"the expected file size in the root.\n"+
+					"\nIt can happen if another process is currently accessing the local files.\n"+
+					"Please take a new snapshot if this is the case.\n", relpath, cpbytes))
+			} else {
+				logger.Print(fmt.Sprintf("OK -- %s (%d bytes)", relpath, cpbytes))
+			}
 		}
 	}
 	logger.Print(fmt.Sprintf("DONE -- %d files copied", count))
 }
 
 func calculate_meta_items(hist *history.Hist) *history.Hist {
-	create := hist.CountCrud("C")
 	retain := hist.CountCrud("R")
+	create := hist.CountCrud("C")
 	update := hist.CountCrud("U")
 	delete := hist.CountCrud("D")
+	ignore := hist.CountCrud("I")
 	total := create + retain + update
 	hist.SetMetaInt("FileCount", total)
+	hist.SetMetaInt("IgnoreCount", ignore)
 
 	// format crud: +9;=20;^2;-1
 	crud := fmt.Sprintf("+%d;=%d;^%d;-%d", create, retain, update, delete)
@@ -112,33 +128,45 @@ func calculate_meta_items(hist *history.Hist) *history.Hist {
 }
 
 func compare(last, new *history.Hist) *history.Hist {
+	// loop over the new files
 	for _, phash := range new.PathHashList() {
-		if !last.IsPathHash(phash) {
-			// 	C = If PathHash not in last
-			new.SetCrud(phash, "C")
-			new.SetTarget(phash, new.SnapId)
-		} else {
-			oldFHash := last.GetFileHash(phash)
-			newFHash := new.GetFileHash(phash)
-			if fileutils.FileHashSame(oldFHash, newFHash) {
-				// 	R = If pathHash in 01 and FileHash same
-				new.SetCrud(phash, "R")
+		if settings.ShouldIgnore(new.GetRelPath(phash)) {
+			new.SetCrud(phash, "I")
+			if last.IsPathHash(phash) {
 				lastTarget := last.GetTarget(phash)
 				new.SetTarget(phash, lastTarget)
 			} else {
-				// 	U = If PathHash in 01 and FileHash not same
-				new.SetCrud(phash, "U")
 				new.SetTarget(phash, new.SnapId)
+			}
+		} else {
+			if !last.IsPathHash(phash) {
+				// 	C = If PathHash not in last
+				new.SetCrud(phash, "C")
+				new.SetTarget(phash, new.SnapId)
+			} else {
+				oldFHash := last.GetFileHash(phash)
+				newFHash := new.GetFileHash(phash)
+				if fileutils.FileHashSame(oldFHash, newFHash) {
+					// 	R = If pathHash in 01 and FileHash same
+					new.SetCrud(phash, "R")
+					lastTarget := last.GetTarget(phash)
+					new.SetTarget(phash, lastTarget)
+				} else {
+					// 	U = If PathHash in 01 and FileHash not same
+					new.SetCrud(phash, "U")
+					new.SetTarget(phash, new.SnapId)
+				}
 			}
 		}
 	}
 
+	// loop over the old files
 	// 	D = [for all PathHash:CRU in 01 not in 02]
 	for _, phash := range last.PathHashList() {
 		lastcrud := last.GetCrud(phash)
-		// file was not deleted in the last ss
-		if lastcrud != "D" {
-			// no such file exist now
+		// file was not deleted/ignored in the last ss
+		if lastcrud != "D" && lastcrud != "I" {
+			// no such file exist now, it has been deleted
 			if !new.IsPathHash(phash) {
 				lf := last.GetAction(phash)
 				new.SetAction(phash, lf)
@@ -161,6 +189,9 @@ func walk_root(hist *history.Hist) *history.Hist {
 			return e
 		}
 
+		// path relative to root
+		relpath, err := fileutils.CalcRelativePath(rootpath, s)
+
 		// ignore items here
 		if d.Name() == fileutils.GetRootSettingsPath() {
 			return nil
@@ -168,7 +199,6 @@ func walk_root(hist *history.Hist) *history.Hist {
 
 		// add the files
 		if !d.IsDir() {
-			relpath, err := fileutils.CalcRelativePath(rootpath, s)
 			if err != nil {
 				logger.Error("snapshot-walk-root", s, "Failed to determine relative path.")
 			}

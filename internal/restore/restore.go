@@ -61,12 +61,15 @@ func Execute() {
 	localHistory = calc_action_items(remoteHistory, localHistory)
 	localHistory, _ = calculate_meta_items(localHistory)
 
+	if args.HasFlag("--ignores") || args.HasFlag("-i") {
+		localHistory.PrintCrud("I")
+	}
 	logger.Print("\nChanges to commit:\n")
 	localHistory.Print()
 
 	if args.HasFlag("--dry") || args.HasFlag("-n") {
 		// --dry has a higher priority over --go
-		logger.Print("\nDry run. Snapshot is NOT restored.")
+		logger.Print(fmt.Sprintf("\nDry run %d > %d. Snapshot is NOT restored.", lastss, newss))
 		logger.Print("Please specify --go to commit the changes.")
 	} else if args.HasFlag("--go") || args.HasFlag("-go") {
 		perform_actions(localHistory)
@@ -74,7 +77,7 @@ func Execute() {
 		settings.Write()
 		logger.Print(fmt.Sprintf("Last snapshot synced: %d", remoteHistory.SnapId))
 	} else {
-		logger.Print("\nDry run. Snapshot is NOT restored.")
+		logger.Print(fmt.Sprintf("\nDry run %d > %d. Snapshot is NOT restored.", lastss, newss))
 		logger.Print("Please specify --go to commit the changes.")
 	}
 }
@@ -95,8 +98,8 @@ func perform_actions(loc *history.Hist) {
 				errmsg := "File does not exist in remote.\n" +
 					"\nMake sure the files/ directory of the current root is okay\n" +
 					"and the files are not missing. If you have manually deleted files\n" +
-					"the file pointers in the shot file might be broken.\n" +
-					"See a detail list of files first using the list <snapshot> command.\n"
+					"the file pointers in the shot files might be broken.\n" +
+					"See a detail list of files first using the list <snapshot number> command.\n"
 
 				logger.Error("restore-action", srcpath, errmsg)
 			}
@@ -107,7 +110,16 @@ func perform_actions(loc *history.Hist) {
 				logger.Error("restore-copyfile", srcpath, "Failed to copy file.")
 			}
 			ccount++
-			logger.Print(fmt.Sprintf("OK -- %s (%d bytes)", relpath, cpbytes))
+			// we know how many bytes should have been copied
+			if !fileutils.FileSizeSame(loc.GetFileHash(phash), cpbytes) {
+				logger.Print(fmt.Sprintf("WARNING -- %s (%d bytes) copy does not match with "+
+					"the expected file size recorded in the remote.\n"+
+					"\nIt can happen if remote file has been manually modified.\n"+
+					"Please take a new snapshot if this is the case,\n"+
+					"otherwise, make sure your remote files are in good conditions.\n", relpath, cpbytes))
+			} else {
+				logger.Print(fmt.Sprintf("OK -- %s (%d bytes)", relpath, cpbytes))
+			}
 		} else if crud == "D" {
 			err := fileutils.DeleteFile(dstpath)
 			if err != nil {
@@ -129,8 +141,10 @@ func calculate_meta_items(hist *history.Hist) (*history.Hist, []int) {
 	retain := hist.CountCrud("R")
 	update := hist.CountCrud("U")
 	delete := hist.CountCrud("D")
+	ignore := hist.CountCrud("I")
 	total := create + retain + update
 	hist.SetMetaInt("FileCount", total)
+	hist.SetMetaInt("IgnoreCount", ignore)
 
 	// format crud: +9;=20;^2;-1
 	crud := fmt.Sprintf("+%d;=%d;^%d;-%d", create, retain, update, delete)
@@ -144,19 +158,24 @@ func calculate_meta_items(hist *history.Hist) (*history.Hist, []int) {
 func calc_action_items(rem, loc *history.Hist) *history.Hist {
 	// For each path in the root,
 	for _, phash := range loc.PathHashList() {
-		if !rem.IsPathHash(phash) {
-			// 	if PathHash not in 02,
-			// 		Delete Path
+		if settings.ShouldIgnore(loc.GetRelPath(phash)) {
+			// we will not touch the file
+			loc.SetCrud(phash, "I")
+		} else if !rem.IsPathHash(phash) {
+			// no such file in the remote
 			loc.SetCrud(phash, "D")
 		}
 	}
 
-	// Foreach PathHash in 02,
+	// Foreach PathHash in remote,
 	for _, phash := range rem.PathHashList() {
 		// similar local file exists
 		if loc.IsPathHash(phash) {
-			// 	if D, Delete WD/Path/Name
-			if rem.GetCrud(phash) == "D" {
+			if settings.ShouldIgnore(loc.GetRelPath(phash)) {
+				// we will not touch the file
+				loc.SetCrud(phash, "I")
+			} else if rem.GetCrud(phash) == "D" {
+				// the file was set to be deleted in the remote
 				loc.SetCrud(phash, "D")
 			} else {
 				// 	if CU, Copy PathHash/02 to WD/Path/Name
@@ -174,8 +193,8 @@ func calc_action_items(rem, loc *history.Hist) *history.Hist {
 				loc.SetTarget(phash, remTarget)
 			}
 		} else {
-			// copy everything else that hasn't been deleted
-			if rem.GetCrud(phash) != "D" {
+			// copy everything else that hasn't been deleted or ignored in the remote
+			if rem.GetCrud(phash) != "D" && rem.GetCrud(phash) != "I" {
 				loc.SetAction(phash, rem.GetAction(phash))
 				loc.SetCrud(phash, "C")
 				remTarget := rem.GetTarget(phash)
@@ -186,12 +205,15 @@ func calc_action_items(rem, loc *history.Hist) *history.Hist {
 	return loc
 }
 
-func check_local_modifications(last, new *history.Hist) {
+func check_local_modifications(last, curr *history.Hist) {
 	if last.SnapId == 0 {
 		return
 	}
-	for _, phash := range new.PathHashList() {
-		relpath := new.GetRelPath(phash)
+	for _, phash := range curr.PathHashList() {
+		relpath := curr.GetRelPath(phash)
+		if settings.ShouldIgnore(relpath) {
+			continue
+		}
 		if !last.IsPathHash(phash) {
 			// 	if PathHash not in LAST,
 			// 	throw error, must shot first before restoring.
@@ -202,7 +224,7 @@ func check_local_modifications(last, new *history.Hist) {
 			// 		compare_with_last_hash()
 			// 		error if no match, must shot first, before restoring.
 			oldFHash := last.GetFileHash(phash)
-			newFHash := new.GetFileHash(phash)
+			newFHash := curr.GetFileHash(phash)
 			if !fileutils.FileHashSame(oldFHash, newFHash) {
 				logger.Error("restore-check-modifications",
 					fmt.Sprintf("U %s\n      (%s =/=> %s)", relpath, oldFHash, newFHash),

@@ -226,7 +226,8 @@ func (h *Hist) formatted_action_string(phash string) string {
 }
 
 func (h *Hist) Print() {
-	h.PrintCrud("R")
+	// h.PrintCrud("I")
+	// h.PrintCrud("R")
 	h.PrintCrud("C")
 	h.PrintCrud("U")
 	h.PrintCrud("D")
@@ -258,9 +259,12 @@ func (h *Hist) Write() {
 	}
 
 	for phash := range h.RelPath {
-		line := h.get_action_string(phash)
-		line = strings.TrimSpace(line)
-		lines = append(lines, line)
+		// do not add the ignored files
+		if h.GetCrud(phash) != "I" {
+			line := h.get_action_string(phash)
+			line = strings.TrimSpace(line)
+			lines = append(lines, line)
+		}
 	}
 
 	snapfile := fileutils.SSFilePath(h.SnapId, h.Remote, h.RootName)

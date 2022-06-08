@@ -15,6 +15,7 @@ type Settings struct {
 	root    map[string]string
 	remotes map[string]string
 	file    string
+	ignores []string
 }
 
 var initialized *Settings = nil
@@ -25,6 +26,7 @@ func Create(rootname string, remotepath string) {
 			root:    make(map[string]string),
 			remotes: make(map[string]string),
 			file:    fileutils.GetRootSettingsPath(),
+			ignores: []string{},
 		}
 	}
 
@@ -73,6 +75,31 @@ func LastSnapshot() int {
 	return ss
 }
 
+func ignore_patterns() []string {
+	uncomment := []string{}
+	for _, v := range initialized.ignores {
+		if strings.Contains(v, "#") {
+			parts := strings.Split(v, "#")
+			uncomment = append(uncomment, strings.TrimSpace(parts[0]))
+		} else {
+			uncomment = append(uncomment, v)
+		}
+	}
+
+	return uncomment
+}
+
+func ShouldIgnore(relpath string) bool {
+	nrel := fileutils.PathNormalize(relpath)
+	for _, pattern := range ignore_patterns() {
+		if fileutils.PathMatch(pattern, nrel) {
+			// fmt.Printf("Ignore (%s): %s\n", pattern, nrel)
+			return true
+		}
+	}
+	return false
+}
+
 func SetLastSnapshot(ssid int) {
 	initialized.root["snapshot"] = strconv.Itoa(ssid)
 }
@@ -111,7 +138,7 @@ func Load() {
 
 func (s *Settings) write() {
 	logger.Trace("settings-write", s.file)
-	file, err := os.OpenFile(s.file, os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(s.file, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 
 	if err != nil {
 		log.Fatalf("failed creating file: %s", err)
@@ -134,6 +161,19 @@ func (s *Settings) write() {
 		datawriter.WriteString(fmt.Sprintf("%s = %s\n", k, v))
 	}
 
+	// Write remotes section title
+	datawriter.WriteString("\n[IGNORES]\n")
+
+	// new settings file
+	if !Exists() {
+		datawriter.WriteString("# Add one ignore pattern per line.\n")
+		datawriter.WriteString("# Comments will be retained only if it comes after a pattern.\n")
+		datawriter.WriteString(".git # Ignore git repository\n")
+	}
+	for _, v := range s.ignores {
+		datawriter.WriteString(fmt.Sprintf("%s\n", v))
+	}
+
 	datawriter.Flush()
 	logger.Done("settings-write", s.file)
 }
@@ -154,7 +194,7 @@ func (s *Settings) read() {
 			line := scanner.Text()
 			line = strings.TrimSpace(line)
 			n := len(line)
-			if n == 0 {
+			if n == 0 || line[0] == '#' {
 				continue
 			}
 			if line[0] == '[' && line[n-1] == ']' {
@@ -170,6 +210,8 @@ func (s *Settings) read() {
 				} else if section == "REMOTES" {
 					s.remotes[k] = fileutils.PathNormalize(v)
 				}
+			} else if section == "IGNORES" {
+				s.ignores = append(s.ignores, line)
 			}
 		}
 

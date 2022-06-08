@@ -118,6 +118,12 @@ func FileHashSame(hash1, hash2 string) bool {
 	return hash1 == hash2
 }
 
+func FileSizeSame(filehash string, size int64) bool {
+	// hash = size + "; " + modt
+	sizeInHash := strings.Split(filehash, ";")[0]
+	return strings.TrimSpace(sizeInHash) == fmt.Sprint(size)
+}
+
 func CalcRelativePath(basepath string, fullpath string) (string, error) {
 	return filepath.Rel(basepath, fullpath)
 }
@@ -211,7 +217,7 @@ func CopyFile(src, dst string) (int64, error) {
 	}
 
 	tmpfile := dst + ".tmp"
-	tmp, err := os.OpenFile(tmpfile, os.O_WRONLY|os.O_CREATE, 0666)
+	tmp, err := os.OpenFile(tmpfile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		in.Close()
 		return 0, fmt.Errorf("couldn't open dest tmpfile: %s", err)

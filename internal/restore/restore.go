@@ -171,7 +171,6 @@ func calc_action_items(rem, loc *history.Hist) *history.Hist {
 		// similar local file exists
 		if loc.IsPathHash(phash) {
 			if settings.ShouldIgnore(loc.GetRelPath(phash)) {
-				// we will not touch the file
 				loc.SetCrud(phash, "I")
 			} else if rem.GetCrud(phash) == "D" {
 				// the file was set to be deleted in the remote
@@ -195,9 +194,13 @@ func calc_action_items(rem, loc *history.Hist) *history.Hist {
 			// copy everything else that hasn't been deleted in the remote
 			if rem.GetCrud(phash) != "D" {
 				loc.SetAction(phash, rem.GetAction(phash))
-				loc.SetCrud(phash, "C")
 				remTarget := rem.GetTarget(phash)
 				loc.SetTarget(phash, remTarget)
+				if settings.ShouldIgnore(rem.GetRelPath(phash)) {
+					loc.SetCrud(phash, "I")
+				} else {
+					loc.SetCrud(phash, "C")
+				}
 			}
 		}
 	}

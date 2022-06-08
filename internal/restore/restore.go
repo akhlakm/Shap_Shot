@@ -274,9 +274,9 @@ func walk_root(hist *history.Hist) *history.Hist {
 }
 
 func calc_latest_ssid(remote string, rootname string) int {
-	for i := 1000; i > 0; i-- {
-		if fileutils.SSExists(i, remote, rootname) {
-			return i
+	for i := 1; i < 1000; i++ {
+		if !fileutils.SSExists(i, remote, rootname) {
+			return i - 1
 		}
 	}
 	return 0

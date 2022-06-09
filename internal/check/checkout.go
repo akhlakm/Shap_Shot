@@ -29,7 +29,7 @@ func Execute() {
 	checkoutPath := args.ReqStr(1, errmsg)
 	remotePath := fileutils.PathJoin(fileutils.BackPath(remote, rootname), checkoutPath)
 
-	ssid, err := args.GetInt(1)
+	ssid, err := args.GetInt(2)
 	if err != nil {
 		ssid = 0
 	}

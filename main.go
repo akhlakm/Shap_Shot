@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"snap/internal/argparser"
+	"snap/internal/check"
 	"snap/internal/initialize"
 	"snap/internal/logger"
 	"snap/internal/restore"
@@ -27,6 +28,8 @@ func main() {
 				restore.Execute()
 			} else if cmd == "list" {
 				status.Execute()
+			} else if cmd == "check" {
+				check.Execute()
 			} else if cmd == "shot" {
 				snapshot.Execute()
 			} else {

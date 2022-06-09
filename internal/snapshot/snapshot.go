@@ -191,6 +191,11 @@ func walk_root(hist *history.Hist) *history.Hist {
 			return nil
 		}
 
+		// ignore the _.shot directory
+		if d.IsDir() && s == fileutils.ShotPath("") {
+			return fs.SkipDir
+		}
+
 		// add the files
 		if !d.IsDir() {
 			if err != nil {

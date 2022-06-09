@@ -77,6 +77,11 @@ func CurrentWD() string {
 	return PathNormalize(cwd)
 }
 
+// temporary checkout directory
+func ShotPath(path string) string {
+	return PathJoin(CurrentWD(), "_.shot", path)
+}
+
 func CalcPathMd5(path string) string {
 	hash := md5.New()
 	for i := 0; i < len(path); i++ {

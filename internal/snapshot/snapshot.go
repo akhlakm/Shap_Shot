@@ -98,6 +98,10 @@ func perform_actions(hist *history.Hist) {
 					"Please take a new snapshot if this is the case.\n", relpath, cpbytes))
 			} else {
 				logger.Print(fmt.Sprintf("OK -- %s (%d bytes)", relpath, cpbytes))
+				// make file read only
+				if err = fileutils.ReadOnly(dstpath); err != nil {
+					logger.Print("WARN -- failed to set read-only attribute.")
+				}
 			}
 		}
 	}

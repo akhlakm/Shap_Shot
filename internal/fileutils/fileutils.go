@@ -267,6 +267,10 @@ func CopyFile(src, dst string) (int64, error) {
 	return bytesWritten, nil
 }
 
+func ReadOnly(filepath string) error {
+	return os.Chmod(filepath, 0444)
+}
+
 func DeleteFile(path string) error {
 	err := os.Remove(path)
 	if err != nil {

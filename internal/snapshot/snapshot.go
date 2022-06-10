@@ -58,6 +58,7 @@ func Execute() {
 	} else if args.HasFlag("--go") || args.HasFlag("-go") {
 		perform_actions(newHistory)
 		newHistory.Write()
+		newHistory.MakeReadOnly()
 		settings.SetLastSnapshot(newHistory.SnapId)
 		settings.Write()
 	} else {

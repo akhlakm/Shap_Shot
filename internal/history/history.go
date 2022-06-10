@@ -287,6 +287,13 @@ func (h *Hist) Write() {
 	file.Close()
 }
 
+func (h *Hist) MakeReadOnly() {
+	snapfile := fileutils.SSFilePath(h.SnapId, h.Remote, h.RootName)
+	if err := fileutils.ReadOnly(snapfile); err != nil {
+		logger.Print("WARN -- failed to make history file read-only.")
+	}
+}
+
 // Load and parse history file
 func (h *Hist) Load() {
 	if h.SnapId == 0 {
